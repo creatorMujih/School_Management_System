@@ -25,7 +25,23 @@ class User(AbstractUser):
         choices=ROLE_CHOICES
     )
 
+class Parent(models.Model):
 
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+
+    phone = models.CharField(
+        max_length=15,
+    )
+
+    address = models.CharField(
+        max_length=50,
+    )
+
+    occupation = models.CharField(
+        max_length=20,
+        blank=True
+    )
+        
 class Student(models.Model):
     admission_number = models.CharField(
         max_length=7,
@@ -57,7 +73,12 @@ class Student(models.Model):
         max_length=50,
     )
 
-    #parent = 
+    parent = models.ForeignKey(
+        Parent, 
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True, 
+    )
 
 
     status = models.CharField(
@@ -68,3 +89,5 @@ class Student(models.Model):
     passport = models.ImageField(
         upload_to="media/students/"
     )
+
+
