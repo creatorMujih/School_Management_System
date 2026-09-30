@@ -41,6 +41,9 @@ class Parent(models.Model):
         max_length=20,
         blank=True
     )
+
+    def __str__(self):
+        return f"{self.user.first_name} {self.user.last_name}"
         
 class Student(models.Model):
     admission_number = models.CharField(
@@ -90,4 +93,5 @@ class Student(models.Model):
         upload_to="media/students/"
     )
 
-
+    def __str__(self):
+        return f"{self.admission_number} - {self.first_name} {self.last_name}"
