@@ -1,3 +1,19 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
+from .forms import AdmissionApplicationForm
+from .services import create_admission_application
 
-# Create your views here.
+def admission_application(request):
+    if request.method == "GET":
+        form = AdmissionApplicationForm()
+
+        return render(request, "accounts/admission_application.html", {"form": form})
+
+    if request.method == "POST":
+        form = AdmissionApplicationForm(request.POST, request.FILES)
+
+        if form.is_valid():
+            data = form.cleaned_data
+            application = create_admission_application(data)
+
+def admission_success(request):
+    return render(request, "accounts/admission_success.html")
