@@ -14,6 +14,15 @@ def admission_application(request):
         if form.is_valid():
             data = form.cleaned_data
             application = create_admission_application(data)
+    
+    return redirect(
+        "admission_success",
+        application_number=application.application_number,
+        )
 
-def admission_success(request):
-    return render(request, "accounts/admission_success.html")
+def admission_success(request, application_number):
+    return render(
+        request, 
+        "accounts/admission_success.html",
+        {"application_number": application_number},
+        )
