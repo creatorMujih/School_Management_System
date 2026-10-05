@@ -18,3 +18,4 @@ class AdmissionApplicationForm(forms.ModelForm):
             "previous_result",
             "passport",
             ]
+
