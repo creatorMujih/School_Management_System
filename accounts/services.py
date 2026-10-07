@@ -1,5 +1,6 @@
 from .models import AdmissionApplication, Student
 from django.utils import timezone
+from django.db import transaction
 
 def generate_application_number():
     if not AdmissionApplication.objects.exists():
@@ -67,10 +68,10 @@ def reject_application(application, reviewer):
     return application
 
 def generate_admission_number():
-    if not AdmissionApplication.objects.exists():
+    if not Student.objects.exists():
         return "0000001"
-    last_admission = AdmissionApplication.objects.last()
-    number = last_application.admission_number[3:]
+    last_student = Student.objects.last()
+    number = last_student.admission_number[3:]
     number = int(number)
     number += 1
     formatted_number = str(number).zfill(4)
@@ -80,5 +81,36 @@ def generate_admission_number():
 def enroll_student(application):
     if application.status != "approved":
         raise ValueError("Application is not approved.")
+    admission_number = generate_admission_number()
+    student = Student.objects.create(
+        admission_number=admission_number,
+        first_name=application.first_name,
+        last_name=application.last_name,
+        other_name=application.other_name,
+        date_of_birth=application.date_of_birth,
+        gender=application.gender,
+        address=application.address,
+        parent=application.parent,
+        passport=application.passport,
+        status="active",
+    )
 
+    with transaction.atomic():
+        student = Student.objects.create(
+            admission_number=admission_number,
+            first_name=application.first_name,
+            last_name=application.last_name,
+            other_name=application.other_name,
+            date_of_birth=application.date_of_birth,
+            gender=application.gender,
+            address=application.address,
+            parent=application.parent,
+            passport=application.passport,
+            status="active",
+        )
 
+        application.status = "enrolled"
+        application.save()
+
+    return student
+    
