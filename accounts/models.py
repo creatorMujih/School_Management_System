@@ -197,3 +197,20 @@ class AdmissionApplication(models.Model):
 
     def __str__(self):
         return f"{self.application_number} - {self.first_name} {self.last_name}"
+
+
+class AcademicSession(models.Model):
+    name = models.CharField(
+        max_length=9
+    )
+   
+    start_date = models.DateField()
+
+    end_date = models.DateField()
+
+    is_current = models.BooleanField(
+        default=False
+    )
+
+def __str__(self):
+    return self.name
