@@ -1,4 +1,4 @@
-from .models import AdmissionApplication, Student
+from .models import AdmissionApplication, Student, AcademicSession, Enrollment, 
 from django.utils import timezone
 from django.db import transaction
 
@@ -81,6 +81,11 @@ def generate_admission_number():
 def enroll_student(application):
     if application.status != "approved":
         raise ValueError("Application is not approved.")
+    
+    AcademicSession.objects.get(
+        is_current=True
+    )
+    
     admission_number = generate_admission_number()
     student = Student.objects.create(
         admission_number=admission_number,

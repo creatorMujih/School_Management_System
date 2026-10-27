@@ -255,9 +255,14 @@ class Enrollment(models.Model):
         )
 
     def __str__(self):
-        return f"{self.school_class} - {self.academic_session} - {self.enrollment_date}"
+        return f"{self.student} - {self.school_class} - {self.academic_session} - {self.enrollment_date}"
 
-    class Meta():
-        s
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "academic_session"],
+                name="unique_student_session_enrollment",
+            )
+        ]
 
 
