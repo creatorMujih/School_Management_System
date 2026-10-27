@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import User, Parent, Student, SchoolClass, AdmissionApplication, AcademicSession, Term, Enrollment
+from .models import User, Parent, Student, SchoolClass, AdmissionApplication, AcademicSession, Term, Enrollment, Teacher, SubjectAssignment
 admin.site.register(User, UserAdmin)
 admin.site.register(Parent)
 admin.site.register(Student)
@@ -10,3 +10,5 @@ admin.site.register(AdmissionApplication)
 admin.site.register(Term)
 admin.site.register(AcademicSession)
 admin.site.register(Enrollment)
+admin.site.register(Teacher)
+admin.site.register(SubjectAssignment)

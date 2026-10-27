@@ -86,21 +86,11 @@ def enroll_student(application):
         current_session = AcademicSession.objects.get(is_current=True)
     except AcademicSession.DoesNotExist:
         raise ValueError("No current academic session has been configured.")
+    except AcademicSession.MultipleObjectsReturned:
+        raise ValueError("More than one current academic session is configured.")
     
 
     admission_number = generate_admission_number()
-    student = Student.objects.create(
-        admission_number=admission_number,
-        first_name=application.first_name,
-        last_name=application.last_name,
-        other_name=application.other_name,
-        date_of_birth=application.date_of_birth,
-        gender=application.gender,
-        address=application.address,
-        parent=application.parent,
-        passport=application.passport,
-        status="active",
-    )
 
     with transaction.atomic():
         student = Student.objects.create(

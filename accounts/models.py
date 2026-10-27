@@ -274,4 +274,54 @@ class Enrollment(models.Model):
             )
         ]
 
+class Subject(models.Model):
+    name = models.CharField(
+        max_length=50, 
+        unique=True
+        )
+    code = models.CharField(
+        max_length=10,
+        unique=True
+        )
+    is_active = models.BooleanField(default=True)
 
+    def __str__(self):
+        return self.name
+
+class Teacher(models.Model):
+    user = models.OneToOneField(
+        User, 
+        on_delete=models.CASCADE
+        )
+    phone = models.CharField(max_length=15)
+    address = models.CharField(max_length=50)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.user.first_name} {self.user.last_name}"
+
+
+class SubjectAssignment(models.Model):
+    teacher = models.ForeignKey(Teacher, on_delete=models.PROTECT)
+    subject = models.ForeignKey(Subject, on_delete=models.PROTECT)
+    school_class = models.ForeignKey(SchoolClass, on_delete=models.PROTECT)
+    academic_session = models.ForeignKey(AcademicSession, on_delete=models.PROTECT)
+
+    def __str__(self):
+        return (
+            f"{self.teacher} - {self.subject} - "
+            f"{self.school_class} - {self.academic_session}"
+        )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "teacher",
+                    "subject",
+                    "school_class",
+                    "academic_session",
+                ],
+                name="unique_teacher_subject_class_session",
+            )
+        ]
