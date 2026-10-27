@@ -1,4 +1,4 @@
-from .models import AdmissionApplication, Student, AcademicSession, Enrollment, 
+from .models import AdmissionApplication, Student, AcademicSession, Enrollment 
 from django.utils import timezone
 from django.db import transaction
 
@@ -82,10 +82,12 @@ def enroll_student(application):
     if application.status != "approved":
         raise ValueError("Application is not approved.")
     
-    AcademicSession.objects.get(
-        is_current=True
-    )
+    try:
+        current_session = AcademicSession.objects.get(is_current=True)
+    except AcademicSession.DoesNotExist:
+        raise ValueError("No current academic session has been configured.")
     
+
     admission_number = generate_admission_number()
     student = Student.objects.create(
         admission_number=admission_number,
@@ -114,8 +116,17 @@ def enroll_student(application):
             status="active",
         )
 
+        enrollment = Enrollment.objects.create(
+            student=student,
+            school_class=application.class_applied_for,
+            academic_session=current_session,
+        )
+
         application.status = "enrolled"
         application.save()
-
     return student
+
+
+
+
     
