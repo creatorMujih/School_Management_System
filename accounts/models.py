@@ -212,8 +212,17 @@ class AcademicSession(models.Model):
         default=False
     )
 
-def __str__(self):
-    return self.name
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["is_current"],
+                condition=models.Q(is_current=True),
+                name="unique_current_academic_session",
+            )
+        ]
 
 
 class Term(models.Model):
