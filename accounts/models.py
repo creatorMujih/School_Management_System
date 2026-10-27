@@ -214,3 +214,50 @@ class AcademicSession(models.Model):
 
 def __str__(self):
     return self.name
+
+
+class Term(models.Model):
+    term = models.CharField(
+    max_length=7,
+    )
+
+    academic_session = models.ForeignKey(
+        AcademicSession,
+        on_delete=models.PROTECT,
+    )
+
+    start_date = models.DateField()
+    end_date = models.DateField()
+
+    def __str__(self):
+        return f"{self.term} - {self.academic_session.name}"
+
+
+class Enrollment(models.Model):
+    student = models.ForeignKey(
+        Student,
+        on_delete=models.PROTECT,
+    )
+
+    school_class = models.ForeignKey(
+        SchoolClass,
+        on_delete=models.PROTECT,
+    )
+
+    academic_session = models.ForeignKey(
+        AcademicSession,
+        on_delete=models.PROTECT,
+    )
+
+    enrollment_date = models.DateField(auto_now_add=True)
+    is_active = models.BooleanField(
+        default=True
+        )
+
+    def __str__(self):
+        return f"{self.school_class} - {self.academic_session} - {self.enrollment_date}"
+
+    class Meta():
+        s
+
+
