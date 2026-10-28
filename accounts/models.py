@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.core.exceptions import ValidationError
 
 ROLE_CHOICES = [
     ("admin", "Admin"),
@@ -325,3 +326,45 @@ class SubjectAssignment(models.Model):
                 name="unique_teacher_subject_class_session",
             )
         ]
+
+
+class AssessmentConfiguration(models.Model):
+    name = models.CharField(max_length=50, unique=True, default="Standard Assessment")
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+    
+    def clean(self):
+        total = sum(
+            component.max_score
+            for component in self.components.all()
+            )
+
+        if total != 100:
+            raise ValidationError(
+                "Assessment component maximums must total 100."
+                )
+    
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["is_active"],
+                condition=models.Q(is_active=True),
+                name="unique_active_assessment_configuration",
+            )
+        ]
+    
+class AssessmentComponent(models.Model):
+    configuration = models.ForeignKey(
+        AssessmentConfiguration,
+        on_delete=models.CASCADE,
+        related_name="components",
+        )
+        
+    name = models.CharField(max_length=30)
+    max_score = models.PositiveSmallIntegerField()
+    order = models.PositiveSmallIntegerField(default=1)
+
+    def __str__(self):
+        return f"{self.name} ({self.max_score})"
