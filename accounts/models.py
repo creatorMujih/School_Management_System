@@ -386,6 +386,26 @@ class Result(models.Model):
         return f"{self.enrollment} - {self.subject} - {self.term}"
     
     def validate_for_publication(self):
+        if (
+            self.term.academic_session_id
+            != self.enrollment.academic_session_id
+        ):
+            raise ValidationError(
+                "The result term must belong to the student's enrolled academic session."
+            )
+            
+        assignment_exists = SubjectAssignment.objects.filter(
+            subject=self.subject,
+            school_class=self.enrollment.school_class,
+            academic_session=self.enrollment.academic_session,
+        ).exists()
+
+        if not assignment_exists:
+            raise ValidationError(
+                "This subject is not assigned to the student's class "
+                "for the enrolled academic session."
+            )  
+             
         components = list(
             self.assessment_configuration.components.all()
         )
@@ -422,7 +442,7 @@ class Result(models.Model):
             raise ValidationError(
                 f"The score for {component.name} exceeds its maximum."
             )
-        
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -472,3 +492,4 @@ class ComponentScore(models.Model):
                 name="unique_result_assessment_component",
             )
         ]
+

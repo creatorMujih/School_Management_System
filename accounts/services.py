@@ -116,6 +116,7 @@ def enroll_student(application):
         application.save()
     return student
 
+@transaction.atomic
 def publish_result(result):
     if result.is_published:
         raise ValueError("This result has already been published.")
