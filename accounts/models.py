@@ -330,21 +330,10 @@ class SubjectAssignment(models.Model):
 
 class AssessmentConfiguration(models.Model):
     name = models.CharField(max_length=50, unique=True, default="Standard Assessment")
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
-    
-    def clean(self):
-        total = sum(
-            component.max_score
-            for component in self.components.all()
-            )
-
-        if total != 100:
-            raise ValidationError(
-                "Assessment component maximums must total 100."
-                )
     
     class Meta:
         constraints = [
@@ -368,3 +357,80 @@ class AssessmentComponent(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.max_score})"
+    
+
+class Result(models.Model):
+    enrollment = models.ForeignKey(
+        Enrollment,
+        on_delete=models.PROTECT,
+    )
+
+    subject = models.ForeignKey(
+        Subject,
+        on_delete=models.PROTECT,
+    )
+
+    term = models.ForeignKey(
+        Term,
+        on_delete=models.PROTECT,
+    )
+    
+    assessment_configuration = models.ForeignKey(
+        AssessmentConfiguration,
+        on_delete=models.PROTECT,
+    )
+
+    is_published = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.enrollment} - {self.subject} - {self.term}"
+    
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+            fields=["enrollment", "subject", "term"],
+            name="unique_enrollment_subject_term_result",
+            )
+        ]
+
+class ComponentScore(models.Model):
+    result = models.ForeignKey(
+        Result,
+        on_delete=models.CASCADE,
+        related_name="component_scores",
+    )
+
+    assessment_component = models.ForeignKey(
+        AssessmentComponent,
+        on_delete=models.PROTECT,
+    )
+
+    score = models.PositiveSmallIntegerField()
+
+    def __str__(self):
+        return (
+            f"{self.result} - "
+            f"{self.assessment_component.name}: {self.score}"
+        )
+    
+    def clean(self):
+        if self.score > self.assessment_component.max_score:
+            raise ValidationError({
+            "score": "Score cannot exceed the component maximum."
+        })
+
+        if (
+            self.assessment_component.configuration_id
+            != self.result.assessment_configuration_id
+        ):
+            raise ValidationError(
+                "The component must belong to the result's assessment configuration."
+            )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["result", "assessment_component"],
+                name="unique_result_assessment_component",
+            )
+        ]
