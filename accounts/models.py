@@ -385,6 +385,44 @@ class Result(models.Model):
     def __str__(self):
         return f"{self.enrollment} - {self.subject} - {self.term}"
     
+    def validate_for_publication(self):
+        components = list(
+            self.assessment_configuration.components.all()
+        )
+
+        if not components:
+            raise ValidationError(
+                "The assessment configuration has no components."
+            )
+
+        if sum(component.max_score for component in components) != 100:
+            raise ValidationError(
+                "Assessment component maximums must total 100."
+            )
+
+        scores = {
+            item.assessment_component_id: item
+            for item in self.component_scores.select_related(
+                "assessment_component"
+            )
+        }
+
+        for score in scores.values():
+            score.full_clean()
+
+        for component in components:
+            if component.id not in scores:
+                raise ValidationError(
+                    f"Missing score for {component.name}."
+                )
+
+        score = scores[component.id]
+
+        if score.score > component.max_score:
+            raise ValidationError(
+                f"The score for {component.name} exceeds its maximum."
+            )
+        
     class Meta:
         constraints = [
             models.UniqueConstraint(

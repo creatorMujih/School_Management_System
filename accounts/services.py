@@ -116,6 +116,18 @@ def enroll_student(application):
         application.save()
     return student
 
+def publish_result(result):
+    if result.is_published:
+        raise ValueError("This result has already been published.")
+
+    result.validate_for_publication()
+
+    result.is_published = True
+    result.save(update_fields=["is_published"])
+
+    return result
+
+
 
 
 

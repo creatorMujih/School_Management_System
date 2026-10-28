@@ -3,7 +3,7 @@ from django.contrib.auth.admin import UserAdmin
 from django.core.exceptions import ValidationError
 from django.forms.models import BaseInlineFormSet
 
-from .models import User, Parent, Student, SchoolClass, AdmissionApplication, AcademicSession, Term, Enrollment, Teacher, SubjectAssignment, AssessmentConfiguration, AssessmentComponent
+from .models import User, Parent, Student, SchoolClass, AdmissionApplication, AcademicSession, Term, Enrollment, Teacher, SubjectAssignment, AssessmentConfiguration, AssessmentComponent, Result, ComponentScore
 admin.site.register(User, UserAdmin)
 admin.site.register(Parent)
 admin.site.register(Student)
@@ -15,6 +15,8 @@ admin.site.register(Enrollment)
 admin.site.register(Teacher)
 admin.site.register(SubjectAssignment)
 admin.site.register(AssessmentComponent)
+admin.site.register(Result)
+admin.site.register(ComponentScore)
 
 
 class AssessmentComponentFormSet(BaseInlineFormSet):
