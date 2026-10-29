@@ -1,4 +1,4 @@
-from .models import AdmissionApplication, Student, AcademicSession, Enrollment 
+from .models import AdmissionApplication, Student, AcademicSession, Enrollment, SubjectAssignment
 from django.utils import timezone
 from django.db import transaction
 
@@ -129,6 +129,40 @@ def publish_result(result):
     return result
 
 
+def get_teacher_assignments(user):
+    """Return the subject assignments belonging to a teacher."""
+    if not user.is_authenticated or user.role != "teacher":
+        return SubjectAssignment.objects.none()
+
+    return SubjectAssignment.objects.filter(
+        teacher__user=user,
+        teacher__is_active=True,
+        school_class__is_active=True,
+        academic_session__is_current=True,
+    ).select_related(
+        "teacher",
+        "subject",
+        "school_class",
+        "academic_session",
+    )
+
+
+def get_students_for_teacher(user, school_class, academic_session):
+    """Return students in a class assigned to this teacher and session."""
+    assignments = get_teacher_assignments(user).filter(
+        school_class=school_class,
+        academic_session=academic_session,
+    )
+
+    if not assignments.exists():
+        return Student.objects.none()
+
+    return Student.objects.filter(
+        enrollments__school_class=school_class,
+        enrollments__academic_session=academic_session,
+        enrollments__is_active=True,
+        status="active",
+    ).distinct().order_by("last_name", "first_name")
 
 
 

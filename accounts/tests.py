@@ -1,6 +1,10 @@
 
 from django.test import TestCase
 from django.core.exceptions import ValidationError
+from accounts.services import (
+    get_teacher_assignments,
+    get_students_for_teacher,
+)
 
 from accounts.models import (
     User,
@@ -379,3 +383,186 @@ class ResultPublicationTests(TestCase):
             "Scores for a published result cannot be deleted.",
         ):
             score.delete()
+
+
+class TeacherAssignmentTests(TestCase):
+    def setUp(self):
+        self.teacher_user = User.objects.create_user(
+            username="assignmentteacher",
+            password="test-password-123",
+            role="teacher",
+        )
+        self.teacher = Teacher.objects.create(
+            user=self.teacher_user,
+        )
+
+        self.other_teacher_user = User.objects.create_user(
+            username="otherassignmentteacher",
+            password="test-password-123",
+            role="teacher",
+        )
+        self.other_teacher = Teacher.objects.create(
+            user=self.other_teacher_user,
+        )
+
+        self.school_class = SchoolClass.objects.create(
+            name="JSS 1",
+            is_active=True,
+        )
+        self.session = AcademicSession.objects.create(
+            name="2027/2028",
+            start_date="2027-09-01",
+            end_date="2028-07-31",
+            is_current=True,
+        )
+        self.subject = Subject.objects.create(
+            name="Mathematics",
+            code="MATH",
+        )
+
+        self.assignment = SubjectAssignment.objects.create(
+            teacher=self.teacher,
+            subject=self.subject,
+            school_class=self.school_class,
+            academic_session=self.session,
+        )
+
+        def test_teacher_sees_own_assignments(self):
+            assignments = get_teacher_assignments(self.teacher_user)
+
+        self.assertEqual(
+            list(assignments),
+            [self.assignment],
+        )
+
+        def test_teacher_cannot_see_another_teachers_assignments(self):
+            other_assignment = SubjectAssignment.objects.create(
+                teacher=self.other_teacher,
+                subject=self.subject,
+                school_class=self.school_class,
+                academic_session=self.session,
+            )
+
+        assignments = get_teacher_assignments(self.teacher_user)
+
+        self.assertIn(self.assignment, assignments)
+        self.assertNotIn(other_assignment, assignments)
+
+        def test_non_teacher_sees_no_assignments(self):
+            parent_user = User.objects.create_user(
+                username="assignmentparent",
+                password="test-password-123",
+                role="parent",
+            )
+
+        assignments = get_teacher_assignments(parent_user)
+
+        self.assertFalse(assignments.exists())
+
+        def test_inactive_teacher_sees_no_assignments(self):
+            self.teacher.is_active = False
+            self.teacher.save()
+
+            assignments = get_teacher_assignments(self.teacher_user)
+
+            self.assertFalse(assignments.exists())
+
+
+        def test_teacher_can_retrieve_students_in_assigned_class(self):
+            tudent = Student.objects.create(
+                admission_number="0000123",
+                first_name="Ada",
+                last_name="Okafor",
+                date_of_birth="2012-04-10",
+                gender="female",
+                address="Lagos",
+                status="active",
+            )
+
+            Enrollment.objects.create(
+                student=student,
+                school_class=self.school_class,
+                academic_session=self.session,
+                is_active=True,
+            )
+
+            students = get_students_for_teacher(
+                self.teacher_user,
+                self.school_class,
+                self.session,
+            )
+
+            self.assertIn(student, students)
+
+        def test_teacher_cannot_retrieve_students_from_unassigned_class(self):
+            other_class = SchoolClass.objects.create(
+                name="JSS 2",
+                is_active=True,
+            )
+
+            student = Student.objects.create(
+                admission_number="0000124",
+                first_name="Tunde",
+                last_name="Bello",
+                date_of_birth="2011-08-15",
+                gender="male",
+                address="Lagos",
+                status="active",
+            )
+
+            Enrollment.objects.create(
+                student=student,
+                school_class=other_class,
+                academic_session=self.session,
+                is_active=True,
+            )
+
+            students = get_students_for_teacher(
+                self.teacher_user,
+                other_class,
+                self.session,
+            )
+
+            self.assertFalse(students.exists())
+
+        def test_teacher_cannot_retrieve_students_from_another_session(self):
+            other_session = AcademicSession.objects.create(
+                name="2028/2029",
+                start_date="2028-09-01",
+                end_date="2029-07-31",
+                is_current=False,
+            )
+
+            students = get_students_for_teacher(
+                self.teacher_user,
+                self.school_class,
+                other_session,
+            )
+
+            self.assertFalse(students.exists())
+
+        def test_inactive_student_is_excluded(self):
+            student = Student.objects.create(
+                admission_number="0000125",
+                first_name="Ngozi",
+                last_name="Eze",
+                date_of_birth="2012-01-20",
+                gender="female",
+                address="Lagos",
+                status="withdrawn",
+            )
+
+            Enrollment.objects.create(
+                student=student,
+                school_class=self.school_class,
+                academic_session=self.session,
+                is_active=True,
+            )
+
+            students = get_students_for_teacher(
+                self.teacher_user,
+                self.school_class,
+                self.session,
+            )
+
+            self.assertNotIn(student, students)
