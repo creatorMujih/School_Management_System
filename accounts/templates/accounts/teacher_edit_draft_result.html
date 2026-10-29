@@ -1,0 +1,44 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Draft Result</title>
+</head>
+<body>
+    <h1>Edit Draft Result</h1>
+
+    <p>
+        Student:
+        {{ result.enrollment.student.first_name }}
+        {{ result.enrollment.student.last_name }}
+    </p>
+
+    <p>Subject: {{ result.subject.name }}</p>
+    <p>Term: {{ result.term.term }}</p>
+    <p>Class: {{ result.enrollment.school_class.name }}</p>
+
+    <form method="post">
+        {% csrf_token %}
+
+        {{ form.non_field_errors }}
+
+        {% for field in form %}
+            <div>
+                {{ field.label_tag }}
+                {{ field }}
+                {{ field.errors }}
+            </div>
+        {% endfor %}
+
+        <button type="submit">Save Draft</button>
+    </form>
+
+    <p>
+        <a href="{% url 'teacher_draft_results' %}">
+            Back to Draft Results
+        </a>
+    </p>
+</body>
+</html>

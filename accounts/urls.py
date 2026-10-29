@@ -10,4 +10,19 @@ urlpatterns = [
         views.admission_success,
         name="admission_success",
         ),
-        ]
+    path(
+        "teacher/results/enter/",
+        views.teacher_result_entry,
+        name="teacher_result_entry",
+        ),
+    path(
+        "teacher/results/drafts/",
+        views.teacher_draft_results,
+        name="teacher_draft_results",
+        ),
+    path(
+        "teacher/results/drafts/<int:result_id>/edit/",
+        views.teacher_edit_draft_result,
+        name="teacher_edit_draft_result",
+        ),
+    ]

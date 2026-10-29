@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enter Student Results</title>
+</head>
+<body>
+    <h1>Enter Student Results</h1>
+
+    {% if configuration_error %}
+        <p>{{ configuration_error }}</p>
+    {% else %}
+        <form method="post">
+            {% csrf_token %}
+
+            {{ entry_form.non_field_errors }}
+            {{ entry_form.as_p }}
+
+            <h2>Assessment Scores</h2>
+
+            {{ component_form.non_field_errors }}
+            {{ component_form.as_p }}
+
+            <button type="submit">Save Draft Result</button>
+        </form>
+    {% endif %}
+</body>
+</html>

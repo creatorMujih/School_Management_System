@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Result Saved</title>
+</head>
+<body>
+    <h1>Draft Result Saved</h1>
+
+    <p>The student's result has been saved successfully as a draft.</p>
+
+    <p>Student: {{ result.enrollment.student.first_name }}
+        {{ result.enrollment.student.last_name }}</p>
+
+    <p>Subject: {{ result.subject.name }}</p>
+
+    <p>Term: {{ result.term.term }}</p>
+
+    <p>Published: {{ result.is_published|yesno:"Yes,No" }}</p>
+
+    <a href="{% url 'teacher_result_entry' %}">
+        Enter Another Result
+    </a>
+</body>
+</html>

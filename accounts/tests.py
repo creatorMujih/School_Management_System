@@ -1,10 +1,15 @@
 
-from django.test import TestCase
+from django.test import TestCase, Client
 from django.core.exceptions import ValidationError
 from accounts.services import (
     get_teacher_assignments,
     get_students_for_teacher,
+    create_draft_result,
+    get_teacher_draft_results,
+    update_draft_result
 )
+from django.urls import reverse
+from django.contrib.auth import get_user_model
 
 from accounts.models import (
     User,
@@ -566,3 +571,604 @@ class TeacherAssignmentTests(TestCase):
             )
 
             self.assertNotIn(student, students)
+
+    
+        def create_active_assessment_configuration(self):
+            configuration = AssessmentConfiguration.objects.create(
+                name="Teacher Entry Configuration",
+                is_active=True,
+            )
+            test_component = AssessmentComponent.objects.create(
+                configuration=configuration,
+                name="Test",
+                max_score=20,
+                order=1,
+            )
+            exam_component = AssessmentComponent.objects.create(
+                configuration=configuration,
+                name="Examination",
+                max_score=80,
+                order=2,
+            )
+            return configuration, test_component, exam_component
+
+        def create_enrolled_student(self):
+            student = Student.objects.create(
+                admission_number="0000456",
+                first_name="Amina",
+                last_name="Bello",
+                date_of_birth="2012-05-12",
+                gender="female",
+                address="Lagos",
+                status="active",
+            )
+            enrollment = Enrollment.objects.create(
+                student=student,
+                school_class=self.school_class,
+                academic_session=self.session,
+                is_active=True,
+            )
+            return enrollment
+
+        def test_teacher_can_create_draft_result(self):
+            self.create_active_assessment_configuration()
+            enrollment = self.create_enrolled_student()
+
+            result = create_draft_result(
+                self.teacher_user,
+                enrollment,
+                self.subject,
+                Term.objects.create(
+                    term="First",
+                    academic_session=self.session,
+                    start_date="2027-09-01",
+                    end_date="2027-12-15",
+                ),
+                {
+                    AssessmentComponent.objects.get(name="Test").pk: 18,
+                    AssessmentComponent.objects.get(name="Examination").pk: 70,
+                },
+            )
+
+            self.assertFalse(result.is_published)
+            self.assertEqual(result.component_scores.count(), 2)
+
+        def test_non_teacher_cannot_create_draft_result(self):
+            self.create_active_assessment_configuration()
+            enrollment = self.create_enrolled_student()
+            term = Term.objects.create(
+                term="First",
+                academic_session=self.session,
+                start_date="2027-09-01",
+                end_date="2027-12-15",
+            )
+
+            with self.assertRaisesMessage(
+                ValidationError,
+                "Only teachers can enter results.",
+            ):
+                create_draft_result(
+                    self.teacher_user.__class__.objects.create_user(
+                        username="draftparent",
+                        password="test-password-123",
+                        role="parent",
+                    ),
+                    enrollment,
+                    self.subject,
+                    term,
+                    {},
+                )
+
+        def test_invalid_component_score_cannot_create_draft(self):
+            _, test_component, exam_component = (
+                self.create_active_assessment_configuration()
+            )
+            enrollment = self.create_enrolled_student()
+            term = Term.objects.create(
+                term="First",
+                academic_session=self.session,
+                start_date="2027-09-01",
+                end_date="2027-12-15",
+            )
+
+            with self.assertRaises(ValidationError):
+                create_draft_result(
+                    self.teacher_user,
+                    enrollment,
+                    self.subject,
+                    term,
+                    {
+                        test_component.pk: 25,
+                        exam_component.pk: 70,
+                    },
+                )
+
+            self.assertFalse(
+                Result.objects.filter(
+                    enrollment=enrollment,
+                    subject=self.subject,
+                    term=term,
+                ).exists()
+            )
+
+
+class TeacherResultEntryViewTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+        self.teacher_user = User.objects.create_user(
+            username="viewteacher",
+            password="test-password-123",
+            role="teacher",
+        )
+        self.teacher = Teacher.objects.create(
+            user=self.teacher_user,
+        )
+
+        self.parent_user = User.objects.create_user(
+            username="viewparent",
+            password="test-password-123",
+            role="parent",
+        )
+
+    def test_logged_out_user_is_redirected_to_login(self):
+        response = self.client.get(
+            reverse("teacher_result_entry")
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_non_teacher_is_denied_access(self):
+        self.client.force_login(self.parent_user)
+
+        response = self.client.get(
+            reverse("teacher_result_entry")
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_teacher_can_open_result_entry_page_without_configuration(self):
+        self.client.force_login(self.teacher_user)
+
+        response = self.client.get(
+            reverse("teacher_result_entry")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "There is no active assessment configuration.",
+        )
+
+    
+    def test_teacher_can_submit_valid_draft_result(self):
+        school_class = SchoolClass.objects.create(
+            name="JSS 1",
+            is_active=True,
+        )
+        session = AcademicSession.objects.create(
+            name="2027/2028",
+            start_date="2027-09-01",
+            end_date="2028-07-31",
+            is_current=True,
+        )
+        term = Term.objects.create(
+            term="First",
+            academic_session=session,
+            start_date="2027-09-01",
+            end_date="2027-12-15",
+        )
+        subject = Subject.objects.create(
+            name="Mathematics",
+            code="MATH",
+            is_active=True,
+        )
+        student = Student.objects.create(
+            admission_number="0000789",
+            first_name="Amina",
+            last_name="Bello",
+            date_of_birth="2012-05-12",
+            gender="female",
+            address="Lagos",
+            status="active",
+        )
+        enrollment = Enrollment.objects.create(
+            student=student,
+            school_class=school_class,
+            academic_session=session,
+            is_active=True,
+        )
+
+        SubjectAssignment.objects.create(
+            teacher=self.teacher,
+            subject=subject,
+            school_class=school_class,
+            academic_session=session,
+        )
+
+        configuration = AssessmentConfiguration.objects.create(
+            name="View Test Configuration",
+            is_active=True,
+        )
+        test_component = AssessmentComponent.objects.create(
+            configuration=configuration,
+            name="Test",
+            max_score=20,
+            order=1,
+        )
+        exam_component = AssessmentComponent.objects.create(
+            configuration=configuration,
+            name="Examination",
+            max_score=80,
+            order=2,
+        )
+
+        self.client.force_login(self.teacher_user)
+
+        response = self.client.post(
+            reverse("teacher_result_entry"),
+            {
+                "enrollment": enrollment.pk,
+                "subject": subject.pk,
+                "term": term.pk,
+                f"component_{test_component.pk}": 18,
+                f"component_{exam_component.pk}": 70,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response,
+            "accounts/teacher_result_success.html",
+        )
+
+        result = Result.objects.get(
+            enrollment=enrollment,
+            subject=subject,
+            term=term,
+        )
+        self.assertFalse(result.is_published)
+        self.assertEqual(result.component_scores.count(), 2)
+
+
+class TeacherDraftResultsTests(TestCase):
+    def setUp(self):
+        self.teacher_user = User.objects.create_user(
+            username="draftteacher",
+            password="test-password-123",
+            role="teacher",
+        )
+        self.teacher = Teacher.objects.create(
+            user=self.teacher_user,
+        )
+
+        self.other_teacher_user = User.objects.create_user(
+            username="otherdraftteacher",
+            password="test-password-123",
+            role="teacher",
+        )
+        self.other_teacher = Teacher.objects.create(
+            user=self.other_teacher_user,
+        )
+
+        self.school_class = SchoolClass.objects.create(
+            name="JSS 1",
+            is_active=True,
+        )
+        self.session = AcademicSession.objects.create(
+            name="2027/2028",
+            start_date="2027-09-01",
+            end_date="2028-07-31",
+            is_current=True,
+        )
+        self.term = Term.objects.create(
+            term="First",
+            academic_session=self.session,
+            start_date="2027-09-01",
+            end_date="2027-12-15",
+        )
+
+        self.subject = Subject.objects.create(
+            name="Mathematics",
+            code="MATH",
+            is_active=True,
+        )
+        self.other_subject = Subject.objects.create(
+            name="English",
+            code="ENG",
+            is_active=True,
+        )
+
+        self.student = Student.objects.create(
+            admission_number="0000781",
+            first_name="Amina",
+            last_name="Bello",
+            date_of_birth="2012-05-12",
+            gender="female",
+            address="Lagos",
+            status="active",
+        )
+        self.enrollment = Enrollment.objects.create(
+            student=self.student,
+            school_class=self.school_class,
+            academic_session=self.session,
+            is_active=True,
+        )
+
+        self.configuration = AssessmentConfiguration.objects.create(
+            name="Draft Test Configuration",
+            is_active=False,
+        )
+
+        SubjectAssignment.objects.create(
+            teacher=self.teacher,
+            subject=self.subject,
+            school_class=self.school_class,
+            academic_session=self.session,
+        )
+
+        self.result = Result.objects.create(
+            enrollment=self.enrollment,
+            subject=self.subject,
+            term=self.term,
+            assessment_configuration=self.configuration,
+        )
+
+    def test_teacher_can_see_own_draft(self):
+        drafts = get_teacher_draft_results(self.teacher_user)
+
+        self.assertIn(self.result, drafts)
+
+    def test_teacher_cannot_see_draft_for_unassigned_subject(self):
+        other_result = Result.objects.create(
+            enrollment=self.enrollment,
+            subject=self.other_subject,
+            term=self.term,
+            assessment_configuration=self.configuration,
+        )
+
+        drafts = get_teacher_draft_results(self.teacher_user)
+
+        self.assertNotIn(other_result, drafts)
+
+    def test_published_results_are_excluded(self):
+        self.result.is_published = True
+        self.result.save(update_fields=["is_published"])
+
+        drafts = get_teacher_draft_results(self.teacher_user)
+
+        self.assertNotIn(self.result, drafts)
+
+    def test_non_teacher_sees_no_drafts(self):
+        parent_user = User.objects.create_user(
+            username="draftparent",
+            password="test-password-123",
+            role="parent",
+        )
+
+        drafts = get_teacher_draft_results(parent_user)
+
+        self.assertFalse(drafts.exists())
+
+
+
+class TeacherDraftResultsViewTests(TestCase):
+    def setUp(self):
+        self.teacher_user = User.objects.create_user(
+            username="draftviewteacher",
+            password="test-password-123",
+            role="teacher",
+        )
+        Teacher.objects.create(user=self.teacher_user)
+
+        self.parent_user = User.objects.create_user(
+            username="draftviewparent",
+            password="test-password-123",
+            role="parent",
+        )
+
+    def test_logged_out_user_is_redirected(self):
+        response = self.client.get(
+            reverse("teacher_draft_results")
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_parent_is_denied_access(self):
+        self.client.force_login(self.parent_user)
+
+        response = self.client.get(
+            reverse("teacher_draft_results")
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_teacher_can_open_draft_results_page(self):
+        self.client.force_login(self.teacher_user)
+
+        response = self.client.get(
+            reverse("teacher_draft_results")
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response,
+            "accounts/teacher_draft_results.html",
+        )
+        self.assertContains(response, "My Draft Results")
+    
+
+
+
+
+class UpdateDraftResultTests(TestCase):
+    def setUp(self):
+        self.teacher_user = User.objects.create_user(
+            username="editteacher",
+            password="test-password-123",
+            role="teacher",
+        )
+        self.teacher = Teacher.objects.create(
+            user=self.teacher_user,
+        )
+
+        self.other_teacher_user = User.objects.create_user(
+            username="othereditteacher",
+            password="test-password-123",
+            role="teacher",
+        )
+        self.other_teacher = Teacher.objects.create(
+            user=self.other_teacher_user,
+        )
+
+        self.school_class = SchoolClass.objects.create(
+            name="JSS 1",
+            is_active=True,
+        )
+        self.session = AcademicSession.objects.create(
+            name="2027/2028",
+            start_date="2027-09-01",
+            end_date="2028-07-31",
+            is_current=True,
+        )
+        self.term = Term.objects.create(
+            term="First",
+            academic_session=self.session,
+            start_date="2027-09-01",
+            end_date="2027-12-15",
+        )
+        self.subject = Subject.objects.create(
+            name="Mathematics",
+            code="MATH",
+            is_active=True,
+        )
+
+        self.student = Student.objects.create(
+            admission_number="0000891",
+            first_name="Amina",
+            last_name="Bello",
+            date_of_birth="2012-05-12",
+            gender="female",
+            address="Lagos",
+            status="active",
+        )
+        self.enrollment = Enrollment.objects.create(
+            student=self.student,
+            school_class=self.school_class,
+            academic_session=self.session,
+            is_active=True,
+        )
+
+        self.configuration = AssessmentConfiguration.objects.create(
+            name="Edit Test Configuration",
+            is_active=False,
+        )
+        self.test_component = AssessmentComponent.objects.create(
+            configuration=self.configuration,
+            name="Test",
+            max_score=20,
+            order=1,
+        )
+        self.exam_component = AssessmentComponent.objects.create(
+            configuration=self.configuration,
+            name="Examination",
+            max_score=80,
+            order=2,
+        )
+
+        SubjectAssignment.objects.create(
+            teacher=self.teacher,
+            subject=self.subject,
+            school_class=self.school_class,
+            academic_session=self.session,
+        )
+
+        self.result = Result.objects.create(
+            enrollment=self.enrollment,
+            subject=self.subject,
+            term=self.term,
+            assessment_configuration=self.configuration,
+        )
+
+        ComponentScore.objects.create(
+            result=self.result,
+            assessment_component=self.test_component,
+            score=10,
+        )
+        ComponentScore.objects.create(
+            result=self.result,
+            assessment_component=self.exam_component,
+            score=60,
+        )
+
+    def test_teacher_can_update_own_draft(self):
+        update_draft_result(
+            self.teacher_user,
+            self.result,
+            {
+                self.test_component.pk: 18,
+                self.exam_component.pk: 70,
+            },
+        )
+
+        self.assertEqual(
+            self.result.component_scores.get(
+                assessment_component=self.test_component
+            ).score,
+            18,
+        )
+        self.assertEqual(
+            self.result.component_scores.get(
+                assessment_component=self.exam_component
+            ).score,
+            70,
+        )
+
+    def test_invalid_score_does_not_update_draft(self):
+        with self.assertRaises(ValidationError):
+            update_draft_result(
+                self.teacher_user,
+                self.result,
+                {
+                    self.test_component.pk: 25,
+                    self.exam_component.pk: 70,
+                },
+            )
+
+        self.assertEqual(
+            self.result.component_scores.get(
+                assessment_component=self.test_component
+            ).score,
+            10,
+        )
+
+    def test_unassigned_teacher_cannot_update_draft(self):
+        with self.assertRaisesMessage(
+            ValidationError,
+            "You are not assigned to this student's class and subject.",
+        ):
+            update_draft_result(
+                self.other_teacher_user,
+                self.result,
+                {
+                    self.test_component.pk: 18,
+                    self.exam_component.pk: 70,
+                },
+            )
+
+    def test_published_result_cannot_be_updated(self):
+        self.result.is_published = True
+        self.result.save(update_fields=["is_published"])
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            "Published results cannot be edited.",
+        ):
+            update_draft_result(
+                self.teacher_user,
+                self.result,
+                {
+                    self.test_component.pk: 18,
+                    self.exam_component.pk: 70,
+                },
+            )
