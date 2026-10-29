@@ -450,6 +450,39 @@ class Result(models.Model):
             name="unique_enrollment_subject_term_result",
             )
         ]
+    def save(self, *args, **kwargs):
+        if self.pk:
+            old_values = type(self).objects.filter(
+                pk=self.pk
+            ).values(
+                *[field.attname for field in self._meta.concrete_fields]
+            ).first()
+
+            if old_values and old_values.get("is_published"):
+                changed_fields = [
+                    field.attname
+                    for field in self._meta.concrete_fields
+                    if old_values.get(field.attname)
+                    != getattr(self, field.attname)
+                ]
+
+                if changed_fields:
+                    raise ValidationError(
+                        "A published result cannot be modified."
+                    )
+
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(
+            pk=self.pk,
+            is_published=True,
+        ).exists():
+            raise ValidationError(
+                "A published result cannot be deleted."
+            )
+
+        return super().delete(*args, **kwargs)
 
 class ComponentScore(models.Model):
     result = models.ForeignKey(
@@ -493,3 +526,37 @@ class ComponentScore(models.Model):
             )
         ]
 
+    def save(self, *args, **kwargs):
+        if self.result_id and Result.objects.filter(
+            pk=self.result_id,
+            is_published=True,
+        ).exists():
+            raise ValidationError(
+                "Scores for a published result cannot be modified."
+            )
+
+        if self.pk:
+            old_score = type(self).objects.filter(
+                pk=self.pk
+            ).values("result_id").first()
+
+            if old_score and Result.objects.filter(
+                pk=old_score["result_id"],
+                is_published=True,
+            ).exists():
+                raise ValidationError(
+                    "Scores for a published result cannot be modified."
+                )
+
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if Result.objects.filter(
+            pk=self.result_id,
+            is_published=True,
+        ).exists():
+            raise ValidationError(
+                "Scores for a published result cannot be deleted."
+            )
+
+        return super().delete(*args, **kwargs)

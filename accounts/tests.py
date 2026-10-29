@@ -301,3 +301,81 @@ class ResultPublicationTests(TestCase):
             "This result has already been published.",
         ):
             publish_result(self.result)
+
+    def create_published_result(self):
+        from accounts.services import publish_result
+
+        test_component = self.add_component("Test", 20, 1)
+        exam_component = self.add_component("Examination", 80, 2)
+
+        ComponentScore.objects.create(
+            result=self.result,
+            assessment_component=test_component,
+            score=18,
+        )
+        ComponentScore.objects.create(
+            result=self.result,
+            assessment_component=exam_component,
+            score=70,
+        )
+
+        publish_result(self.result)
+        self.result.refresh_from_db()
+        return test_component
+
+
+    def test_published_result_cannot_be_modified(self):
+        self.create_published_result()
+
+        another_subject = Subject.objects.create(
+            name="English",
+            code="ENG",
+        )
+        self.result.subject = another_subject
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            "A published result cannot be modified.",
+        ):
+            self.result.save()
+
+
+    def test_published_result_cannot_be_deleted(self):
+        self.create_published_result()
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            "A published result cannot be deleted.",
+        ):
+            self.result.delete()
+
+
+    def test_score_for_published_result_cannot_be_modified(self):
+        test_component = self.create_published_result()
+
+        score = ComponentScore.objects.get(
+            result=self.result,
+            assessment_component=test_component,
+        )
+        score.score = 19
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            "Scores for a published result cannot be modified.",
+        ):
+            score.save()
+
+
+    def test_score_for_published_result_cannot_be_deleted(self):
+        test_component = self.create_published_result()
+
+        score = ComponentScore.objects.get(
+            result=self.result,
+            assessment_component=test_component,
+        )
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            "Scores for a published result cannot be deleted.",
+        ):
+            score.delete()
