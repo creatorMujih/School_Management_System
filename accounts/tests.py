@@ -1,4 +1,3 @@
-
 from django.test import TestCase, Client
 from django.core.exceptions import ValidationError
 from accounts.services import (
@@ -998,8 +997,218 @@ class TeacherDraftResultsViewTests(TestCase):
         self.assertContains(response, "My Draft Results")
     
 
+class TeacherEditDraftResultViewTests(TestCase):
+    def setUp(self):
+        self.teacher_user = User.objects.create_user(
+            username="editviewteacher",
+            password="test-password-123",
+            role="teacher",
+        )
+        self.teacher = Teacher.objects.create(
+            user=self.teacher_user
+        )
 
+        self.other_teacher_user = User.objects.create_user(
+            username="othereditviewteacher",
+            password="test-password-123",
+            role="teacher",
+        )
+        self.other_teacher = Teacher.objects.create(
+            user=self.other_teacher_user
+        )
 
+        self.parent_user = User.objects.create_user(
+            username="editviewparent",
+            password="test-password-123",
+            role="parent",
+        )
+
+        self.school_class = SchoolClass.objects.create(
+            name="JSS Edit Test",
+            is_active=True,
+        )
+
+        self.session = AcademicSession.objects.create(
+            name="2028/2029 Edit Test",
+            start_date="2028-09-01",
+            end_date="2029-07-31",
+            is_current=True,
+        )
+
+        self.term = Term.objects.create(
+            term="First",
+            academic_session=self.session,
+            start_date="2028-09-01",
+            end_date="2028-12-15",
+        )
+
+        self.subject = Subject.objects.create(
+            name="Edit Test Mathematics",
+            code="EDTM",
+            is_active=True,
+        )
+
+        self.student = Student.objects.create(
+            admission_number="0000991",
+            first_name="Test",
+            last_name="Student",
+            date_of_birth="2012-05-12",
+            gender="female",
+            address="Lagos",
+            status="active",
+        )
+
+        self.enrollment = Enrollment.objects.create(
+            student=self.student,
+            school_class=self.school_class,
+            academic_session=self.session,
+            is_active=True,
+        )
+
+        self.configuration = AssessmentConfiguration.objects.create(
+            name="Edit View Configuration",
+            is_active=False,
+        )
+
+        self.test_component = AssessmentComponent.objects.create(
+            configuration=self.configuration,
+            name="Test",
+            max_score=20,
+            order=1,
+        )
+
+        self.exam_component = AssessmentComponent.objects.create(
+            configuration=self.configuration,
+            name="Examination",
+            max_score=80,
+            order=2,
+        )
+
+        SubjectAssignment.objects.create(
+            teacher=self.teacher,
+            subject=self.subject,
+            school_class=self.school_class,
+            academic_session=self.session,
+        )
+
+        self.result = Result.objects.create(
+            enrollment=self.enrollment,
+            subject=self.subject,
+            term=self.term,
+            assessment_configuration=self.configuration,
+        )
+
+        ComponentScore.objects.create(
+            result=self.result,
+            assessment_component=self.test_component,
+            score=10,
+        )
+
+        ComponentScore.objects.create(
+            result=self.result,
+            assessment_component=self.exam_component,
+            score=60,
+        )
+
+        self.edit_url = reverse(
+            "teacher_edit_draft_result",
+            args=[self.result.pk],
+        )
+
+    def test_logged_out_user_is_redirected(self):
+        response = self.client.get(self.edit_url)
+        self.assertEqual(response.status_code, 302)
+
+    def test_parent_is_denied_access(self):
+        self.client.force_login(self.parent_user)
+
+        response = self.client.get(self.edit_url)
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_teacher_can_open_own_draft(self):
+        self.client.force_login(self.teacher_user)
+
+        response = self.client.get(self.edit_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response,
+            "accounts/teacher_edit_draft_result.html",
+        )
+        self.assertContains(response, "Test")
+        self.assertContains(response, "Student")
+        self.assertContains(response, "Save Draft")
+
+    def test_teacher_can_update_own_draft(self):
+        self.client.force_login(self.teacher_user)
+
+        response = self.client.post(
+            self.edit_url,
+            {
+                f"component_{self.test_component.pk}": 18,
+                f"component_{self.exam_component.pk}": 70,
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("teacher_draft_results"),
+        )
+
+        self.result.refresh_from_db()
+
+        self.assertEqual(
+            self.result.component_scores.get(
+                assessment_component=self.test_component
+            ).score,
+            18,
+        )
+        self.assertEqual(
+            self.result.component_scores.get(
+                assessment_component=self.exam_component
+            ).score,
+            70,
+        )
+
+    def test_invalid_score_does_not_update_draft(self):
+        self.client.force_login(self.teacher_user)
+
+        response = self.client.post(
+            self.edit_url,
+            {
+                f"component_{self.test_component.pk}": 25,
+                f"component_{self.exam_component.pk}": 70,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.result.refresh_from_db()
+
+        self.assertEqual(
+            self.result.component_scores.get(
+                assessment_component=self.test_component
+            ).score,
+            10,
+        )
+
+    def test_teacher_cannot_edit_another_teachers_draft(self):
+        self.client.force_login(self.other_teacher_user)
+
+        response = self.client.get(self.edit_url)
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_teacher_cannot_edit_published_result(self):
+        self.result.is_published = True
+        self.result.save(update_fields=["is_published"])
+
+        self.client.force_login(self.teacher_user)
+
+        response = self.client.get(self.edit_url)
+
+        self.assertEqual(response.status_code, 404)
 
 class UpdateDraftResultTests(TestCase):
     def setUp(self):

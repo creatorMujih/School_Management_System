@@ -1,9 +1,10 @@
-from accounts.models import AssessmentConfiguration
+from accounts.models import AssessmentConfiguration, Result
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.shortcuts import render, redirect, get_object_or_404
 from .forms import AdmissionApplicationForm, TeacherResultEntryForm, ComponentScoreEntryForm
-from .services import create_admission_application, create_draft_result, get_teacher_draft_results, update_draft_result
+from .services import create_admission_application, create_draft_result, get_teacher_draft_results, update_draft_result, publish_result
 
 
 def admission_application(request):
@@ -172,4 +173,53 @@ def teacher_edit_draft_result(request, result_id):
             "result": result,
             "form": form,
         },
+    )
+
+
+
+@login_required
+def admin_result_publication(request):
+    if request.user.role != "admin":
+        raise PermissionDenied(
+            "Only administrators can publish results."
+        )
+
+    if request.method == "POST":
+        result_id = request.POST.get("result_id")
+
+        result = get_object_or_404(
+            Result,
+            pk=result_id,
+            is_published=False,
+        )
+
+        try:
+            publish_result(result)
+        except (ValidationError, ValueError) as error:
+            messages.error(request, str(error))
+        else:
+            messages.success(
+                request,
+                "Result published successfully.",
+            )
+
+        return redirect("admin_result_publication")
+
+    results = Result.objects.filter(
+        is_published=False
+    ).select_related(
+        "enrollment__student",
+        "enrollment__school_class",
+        "subject",
+        "term",
+    ).order_by(
+        "term__academic_session__name",
+        "term__term",
+        "subject__name",
+    )
+
+    return render(
+        request,
+        "accounts/admin_result_publication.html",
+        {"results": results},
     )
