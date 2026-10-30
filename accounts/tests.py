@@ -1381,3 +1381,197 @@ class UpdateDraftResultTests(TestCase):
                     self.exam_component.pk: 70,
                 },
             )
+
+
+class AdminResultPublicationViewTests(TestCase):
+    def setUp(self):
+        self.admin_user = User.objects.create_user(
+            username="publicationadmin",
+            password="test-password-123",
+            role="admin",
+        )
+
+        self.teacher_user = User.objects.create_user(
+            username="publicationteacher",
+            password="test-password-123",
+            role="teacher",
+        )
+
+        self.parent_user = User.objects.create_user(
+            username="publicationparent",
+            password="test-password-123",
+            role="parent",
+        )
+
+        self.school_class = SchoolClass.objects.create(
+            name="JSS Publication",
+            is_active=True,
+        )
+
+        self.session = AcademicSession.objects.create(
+            name="2029/2030 Publication",
+            start_date="2029-09-01",
+            end_date="2030-07-31",
+            is_current=True,
+        )
+
+        self.term = Term.objects.create(
+            term="First",
+            academic_session=self.session,
+            start_date="2029-09-01",
+            end_date="2029-12-15",
+        )
+
+        self.student = Student.objects.create(
+            admission_number="0000992",
+            first_name="Publication",
+            last_name="Student",
+            date_of_birth="2012-05-12",
+            gender="female",
+            address="Lagos",
+            status="active",
+        )
+
+        self.enrollment = Enrollment.objects.create(
+            student=self.student,
+            school_class=self.school_class,
+            academic_session=self.session,
+            is_active=True,
+        )
+
+        self.subject = Subject.objects.create(
+            name="Publication Mathematics",
+            code="PUBM",
+            is_active=True,
+        )
+
+        self.configuration = AssessmentConfiguration.objects.create(
+            name="Publication Test Configuration",
+            is_active=False,
+        )
+
+        self.test_component = AssessmentComponent.objects.create(
+            configuration=self.configuration,
+            name="Test",
+            max_score=20,
+            order=1,
+        )
+
+        self.exam_component = AssessmentComponent.objects.create(
+            configuration=self.configuration,
+            name="Examination",
+            max_score=80,
+            order=2,
+        )
+
+        teacher = Teacher.objects.create(
+            user=self.teacher_user,
+        )
+
+        SubjectAssignment.objects.create(
+            teacher=teacher,
+            subject=self.subject,
+            school_class=self.school_class,
+            academic_session=self.session,
+        )
+
+        self.result = Result.objects.create(
+            enrollment=self.enrollment,
+            subject=self.subject,
+            term=self.term,
+            assessment_configuration=self.configuration,
+        )
+
+        ComponentScore.objects.create(
+            result=self.result,
+            assessment_component=self.test_component,
+            score=18,
+        )
+
+        ComponentScore.objects.create(
+            result=self.result,
+            assessment_component=self.exam_component,
+            score=70,
+        )
+
+        self.url = reverse("admin_result_publication")
+
+    def test_logged_out_user_is_redirected(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_teacher_is_denied_access(self):
+        self.client.force_login(self.teacher_user)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_parent_is_denied_access(self):
+        self.client.force_login(self.parent_user)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_can_open_publication_page(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response,
+            "accounts/admin_result_publication.html",
+        )
+        self.assertContains(response, "Publication Student")
+        self.assertContains(response, "Publish Result")
+
+    def test_admin_can_publish_valid_result(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            self.url,
+            {"result_id": self.result.pk},
+        )
+
+        self.assertRedirects(response, self.url)
+
+        self.result.refresh_from_db()
+
+        self.assertTrue(self.result.is_published)
+
+    def test_admin_cannot_publish_invalid_result(self):
+        ComponentScore.objects.filter(
+            result=self.result,
+            assessment_component=self.test_component,
+        ).delete()
+
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            self.url,
+            {"result_id": self.result.pk},
+        )
+
+        self.assertRedirects(response, self.url)
+
+        self.result.refresh_from_db()
+
+        self.assertFalse(self.result.is_published)
+
+    def test_published_result_is_not_listed_again(self):
+        self.client.force_login(self.admin_user)
+
+        self.client.post(
+            self.url,
+            {"result_id": self.result.pk},
+        )
+
+        response = self.client.get(self.url)
+
+        self.assertNotContains(
+            response,
+            "Publication Student",
+        )
