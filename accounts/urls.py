@@ -30,4 +30,14 @@ urlpatterns = [
         views.admin_result_publication,
         name="admin_result_publication",
         ),
+    path(
+        "login/", 
+        views.login_view, 
+        name="login"
+        ),
+    path(
+        "", 
+        views.home, 
+        name="home"
+        ),
     ]

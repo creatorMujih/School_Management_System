@@ -1,4 +1,5 @@
 from accounts.models import AssessmentConfiguration, Result
+from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -223,3 +224,57 @@ def admin_result_publication(request):
         "accounts/admin_result_publication.html",
         {"results": results},
     )
+
+
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect("home")
+
+    if request.method == "POST":
+        username = request.POST.get("username")
+        password = request.POST.get("password")
+
+        user = authenticate(
+            request,
+            username=username,
+            password=password,
+        )
+
+        if user is not None:
+            login(request, user)
+
+            next_url = request.GET.get("next")
+
+            if next_url:
+                return redirect(next_url)
+
+            return redirect("home")
+
+        messages.error(
+            request,
+            "Invalid username or password.",
+        )
+
+    return render(
+        request,
+        "accounts/login.html",
+    )
+
+@login_required
+def home(request):
+    role = request.user.role
+
+    if role == "admin":
+        dashboard = "accounts/admin_dashboard.html"
+    elif role == "teacher":
+        dashboard = "accounts/teacher_dashboard.html"
+    elif role == "parent":
+        dashboard = "accounts/parent_dashboard.html"
+    elif role == "student":
+        dashboard = "accounts/student_dashboard.html"
+    else:
+        raise PermissionDenied(
+            "Your account does not have a valid role."
+        )
+
+    return render(request, dashboard)

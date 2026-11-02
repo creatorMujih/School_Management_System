@@ -130,4 +130,4 @@ MAILERS = {
     },
 }
 
-LOGIN_URL = "/accounts/login/"
+LOGIN_URL = "login"

@@ -9,7 +9,6 @@ from accounts.services import (
 )
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-
 from accounts.models import (
     User,
     Parent,
@@ -1574,4 +1573,81 @@ class AdminResultPublicationViewTests(TestCase):
         self.assertNotContains(
             response,
             "Publication Student",
+        )
+
+
+class RoleBasedDashboardTests(TestCase):
+    def setUp(self):
+        self.admin_user = User.objects.create_user(
+            username="dashboardadmin",
+            password="test-password-123",
+            role="admin",
+        )
+
+        self.teacher_user = User.objects.create_user(
+            username="dashboardteacher",
+            password="test-password-123",
+            role="teacher",
+        )
+
+        self.parent_user = User.objects.create_user(
+            username="dashboardparent",
+            password="test-password-123",
+            role="parent",
+        )
+
+        self.student_user = User.objects.create_user(
+            username="dashboardstudent",
+            password="test-password-123",
+            role="student",
+        )
+
+        self.url = reverse("home")
+
+    def test_admin_sees_admin_dashboard(self):
+        self.client.force_login(self.admin_user)
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response,
+            "accounts/admin_dashboard.html",
+        )
+
+    def test_teacher_sees_teacher_dashboard(self):
+        self.client.force_login(self.teacher_user)
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response,
+            "accounts/teacher_dashboard.html",
+        )
+
+    def test_parent_sees_parent_dashboard(self):
+        self.client.force_login(self.parent_user)
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response,
+            "accounts/parent_dashboard.html",
+        )
+
+    def test_student_sees_student_dashboard(self):
+        self.client.force_login(self.student_user)
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response,
+            "accounts/student_dashboard.html",
+        )
+
+    def test_logged_out_user_is_redirected(self):
+        response = self.client.get(self.url)
+
+        self.assertRedirects(
+            response,
+            "/login/?next=/",
         )
