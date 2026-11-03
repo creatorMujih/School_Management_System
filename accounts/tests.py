@@ -1713,3 +1713,33 @@ class LoginRedirectTests(TestCase):
             reverse("home"),
             fetch_redirect_response=False,
         )
+
+class LogoutTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="logoutuser",
+            password="test-password-123",
+            role="admin",
+        )
+        self.url = reverse("logout")
+
+    def test_authenticated_user_can_logout(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(self.url)
+
+        self.assertRedirects(
+            response,
+            reverse("login"),
+            fetch_redirect_response=False,
+        )
+
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_logout_rejects_get_request(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 405)
+        self.assertIn("_auth_user_id", self.client.session)

@@ -2,10 +2,39 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Teacher Dashboard</title>
 </head>
 <body>
     <h1>Teacher Dashboard</h1>
-    <p>Welcome to the School Management System.</p>
+
+    <p>Welcome, {{ request.user.username }}.</p>
+
+    <h2>My Assigned Classes and Subjects</h2>
+
+    {% if assignments %}
+        <table border="1" cellpadding="10">
+            <thead>
+                <tr>
+                    <th>Class</th>
+                    <th>Subject</th>
+                    <th>Academic Session</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for assignment in assignments %}
+                    <tr>
+                        <td>{{ assignment.school_class.name }}</td>
+                        <td>{{ assignment.subject.name }}</td>
+                        <td>{{ assignment.academic_session.name }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>You currently have no active class or subject assignments.</p>
+    {% endif %}
+
 </body>
 </html>

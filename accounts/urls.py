@@ -1,9 +1,12 @@
 from django.urls import path
 from . import views
+from django.contrib.auth.views import LogoutView
 
 urlpatterns = [
     path(
-        "admission/", views.admission_application, name="admission_application"
+        "admission/", 
+        views.admission_application, 
+        name="admission_application"
         ),
     path(
         "admission/success/<str:application_number>/",
@@ -39,5 +42,10 @@ urlpatterns = [
         "", 
         views.home, 
         name="home"
+        ),
+    path(
+        "logout/", 
+        LogoutView.as_view(next_page="login"), 
+        name="logout"
         ),
     ]

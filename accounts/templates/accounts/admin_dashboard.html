@@ -2,10 +2,39 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Administrator Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
 </head>
 <body>
-    <h1>Administrator Dashboard</h1>
-    <p>Welcome to the School Management System.</p>
+    <h1>School Management System</h1>
+    <h2>Admin Dashboard</h2>
+
+    <p>Welcome, {{ request.user.username }}!</p>
+
+    <h3>Admission Management</h3>
+    <ul>
+        <li>
+            <a href="{% url 'admission_application' %}">
+                Admission Applications
+            </a>
+        </li>
+    </ul>
+
+    <h3>Result Management</h3>
+    <ul>
+        <li>
+            <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit">Logout</button>
+    </form>
+        </li>
+    </ul>
+
+    <h3>Account</h3>
+    <ul>
+        <li>
+            <a href="{% url 'logout' %}">Logout</a>
+        </li>
+    </ul>
 </body>
 </html>

@@ -265,17 +265,27 @@ def home(request):
 
     if role == "admin":
         dashboard = "accounts/admin_dashboard.html"
+        context = {}
+
     elif role == "teacher":
         dashboard = "accounts/teacher_dashboard.html"
+        assignments = get_teacher_assignments(request.user)
+
+        context = {
+            "assignments": assignments,
+        }
+
     elif role == "parent":
         dashboard = "accounts/parent_dashboard.html"
+        context = {}
+
     elif role == "student":
         dashboard = "accounts/student_dashboard.html"
+        context = {}
+
     else:
         raise PermissionDenied(
             "Your account does not have a valid role."
         )
 
-    return render(request, dashboard)
-
-
+    return render(request, dashboard, context)
