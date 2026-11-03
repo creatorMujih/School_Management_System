@@ -26,7 +26,7 @@ urlpatterns = [
         name="teacher_edit_draft_result",
         ),
     path(
-        "admin/results/publication/",
+        "administration/results/publication/",
         views.admin_result_publication,
         name="admin_result_publication",
         ),

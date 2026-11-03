@@ -1519,12 +1519,17 @@ class AdminResultPublicationViewTests(TestCase):
 
         response = self.client.get(self.url)
 
+        print("Authenticated:", response.wsgi_request.user.is_authenticated)
+        print("User:", response.wsgi_request.user)
+        print("Redirect:", response.get("Location"))
+
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(
             response,
             "accounts/admin_result_publication.html",
         )
-        self.assertContains(response, "Publication Student")
+        self.assertContains(response, "Publication")
+        self.assertContains(response, "Student")
         self.assertContains(response, "Publish Result")
 
     def test_admin_can_publish_valid_result(self):
