@@ -6,6 +6,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.shortcuts import render, redirect, get_object_or_404
 from .forms import AdmissionApplicationForm, TeacherResultEntryForm, ComponentScoreEntryForm
 from .services import create_admission_application, create_draft_result, get_teacher_draft_results, update_draft_result, publish_result
+from django.utils.http import url_has_allowed_host_and_scheme
 
 
 def admission_application(request):
@@ -243,22 +244,20 @@ def login_view(request):
         if user is not None:
             login(request, user)
 
-            next_url = request.GET.get("next")
+            next_url = request.POST.get("next") or request.GET.get("next")
 
-            if next_url:
+            if next_url and url_has_allowed_host_and_scheme(
+                url=next_url,
+                allowed_hosts={request.get_host()},
+                require_https=request.is_secure(),
+            ):
                 return redirect(next_url)
 
             return redirect("home")
 
-        messages.error(
-            request,
-            "Invalid username or password.",
-        )
+        messages.error(request, "Invalid username or password.")
 
-    return render(
-        request,
-        "accounts/login.html",
-    )
+    return render(request, "accounts/login.html")
 
 @login_required
 def home(request):

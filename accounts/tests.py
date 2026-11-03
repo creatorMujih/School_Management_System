@@ -1656,3 +1656,4 @@ class RoleBasedDashboardTests(TestCase):
             response,
             "/login/?next=/",
         )
+
