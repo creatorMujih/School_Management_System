@@ -1657,3 +1657,59 @@ class RoleBasedDashboardTests(TestCase):
             "/login/?next=/",
         )
 
+class LoginRedirectTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="redirectuser",
+            password="test-password-123",
+            role="admin",
+        )
+
+        self.url = reverse("login")
+
+    def test_login_redirects_to_valid_local_next_url(self):
+        response = self.client.post(
+            self.url,
+            {
+                "username": "redirectuser",
+                "password": "test-password-123",
+                "next": "/administration/results/publication/",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            "/administration/results/publication/",
+            fetch_redirect_response=False,
+        )
+
+    def test_login_rejects_external_next_url(self):
+        response = self.client.post(
+            self.url,
+            {
+                "username": "redirectuser",
+                "password": "test-password-123",
+                "next": "https://example.com",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("home"),
+            fetch_redirect_response=False,
+        )
+
+    def test_login_without_next_url_redirects_to_home(self):
+        response = self.client.post(
+            self.url,
+            {
+                "username": "redirectuser",
+                "password": "test-password-123",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("home"),
+            fetch_redirect_response=False,
+        )
