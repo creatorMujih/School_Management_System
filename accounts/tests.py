@@ -1,5 +1,6 @@
 from django.test import TestCase, Client
 from django.core.exceptions import ValidationError
+from datetime import date
 from accounts.services import (
     get_teacher_assignments,
     get_students_for_teacher,
@@ -1581,6 +1582,9 @@ class AdminResultPublicationViewTests(TestCase):
         )
 
 
+
+from datetime import date
+
 class RoleBasedDashboardTests(TestCase):
     def setUp(self):
         self.admin_user = User.objects.create_user(
@@ -1607,7 +1611,26 @@ class RoleBasedDashboardTests(TestCase):
             role="student",
         )
 
+        # Create the parent's profile.
+        self.parent_profile = Parent.objects.create(
+            user=self.parent_user,
+            phone="08012345678",
+            address="Lagos",
+        )
+
         self.url = reverse("home")
+
+    def create_student(self, admission_number, parent):
+        return Student.objects.create(
+            admission_number=admission_number,
+            first_name="Test",
+            last_name="Student",
+            date_of_birth=date(2015, 1, 1),
+            gender="male",
+            address="Lagos",
+            parent=parent,
+            status="active",
+        )
 
     def test_admin_sees_admin_dashboard(self):
         self.client.force_login(self.admin_user)
@@ -1639,6 +1662,56 @@ class RoleBasedDashboardTests(TestCase):
             "accounts/parent_dashboard.html",
         )
 
+    def test_parent_sees_only_own_children(self):
+        own_child = self.create_student(
+            "STU0001",
+            self.parent_profile,
+        )
+
+        other_parent_user = User.objects.create_user(
+            username="otherparent",
+            password="test-password-123",
+            role="parent",
+        )
+
+        other_parent = Parent.objects.create(
+            user=other_parent_user,
+            phone="08087654321",
+            address="Abuja",
+        )
+
+        other_child = self.create_student(
+            "STU0002",
+            other_parent,
+        )
+
+        self.client.force_login(self.parent_user)
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+
+        children = response.context["children"]
+
+        self.assertIn(own_child, children)
+        self.assertNotIn(other_child, children)
+
+    def test_parent_without_profile_sees_empty_children(self):
+        self.parent_profile.delete()
+
+        self.client.force_login(self.parent_user)
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response,
+            "accounts/parent_dashboard.html",
+        )
+
+        self.assertEqual(
+            response.context["children"].count(),
+            0,
+        )
+
     def test_student_sees_student_dashboard(self):
         self.client.force_login(self.student_user)
         response = self.client.get(self.url)
@@ -1648,6 +1721,28 @@ class RoleBasedDashboardTests(TestCase):
             response,
             "accounts/student_dashboard.html",
         )
+    def test_student_does_not_receive_parent_children_context(self):
+        self.client.force_login(self.student_user)
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response,
+            "accounts/student_dashboard.html",
+        )
+        self.assertNotIn("children", response.context)
+
+
+    def test_teacher_does_not_receive_parent_children_context(self):
+        self.client.force_login(self.teacher_user)
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response,
+            "accounts/teacher_dashboard.html",
+        )
+        self.assertNotIn("children", response.context)
 
     def test_logged_out_user_is_redirected(self):
         response = self.client.get(self.url)
@@ -1657,6 +1752,211 @@ class RoleBasedDashboardTests(TestCase):
             "/login/?next=/",
         )
 
+    def test_teacher_can_access_result_entry(self):
+        self.client.force_login(self.teacher_user)
+
+        response = self.client.get(
+            reverse("teacher_result_entry")
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+
+    def test_student_cannot_access_result_entry(self):
+        self.client.force_login(self.student_user)
+
+        response = self.client.get(
+            reverse("teacher_result_entry")
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+
+    def test_admin_can_access_result_publication(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(
+            reverse("admin_result_publication")
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+
+    def test_teacher_cannot_access_result_publication(self):
+        self.client.force_login(self.teacher_user)
+
+        response = self.client.get(
+            reverse("admin_result_publication")
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_teacher_cannot_edit_another_teachers_draft(self):
+        self.client.force_login(self.teacher_user)
+
+        response = self.client.get(
+            reverse(
+                "teacher_edit_draft_result",
+                args=[self.other_teacher_draft.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+class TeacherDraftOwnershipTests(TestCase):
+
+    def setUp(self):
+        # Create two teachers.
+        self.teacher_user = User.objects.create_user(
+            username="teacherone",
+            password="test-password-123",
+            role="teacher",
+        )
+
+        self.other_teacher_user = User.objects.create_user(
+            username="teachertwo",
+            password="test-password-123",
+            role="teacher",
+        )
+
+        self.teacher = Teacher.objects.create(
+            user=self.teacher_user,
+            phone="08011111111",
+            address="Lagos",
+        )
+
+        self.other_teacher = Teacher.objects.create(
+            user=self.other_teacher_user,
+            phone="08022222222",
+            address="Abuja",
+        )
+
+        # Create two active classes.
+        self.class_one = SchoolClass.objects.create(
+            name="JSS 1",
+            is_active=True,
+        )
+
+        self.class_two = SchoolClass.objects.create(
+            name="JSS 2",
+            is_active=True,
+        )
+
+        # Create a current academic session.
+        self.session = AcademicSession.objects.create(
+            name="2026/2027",
+            start_date=date(2026, 9, 1),
+            end_date=date(2027, 7, 31),
+            is_current=True,
+        )
+
+        # Create separate subjects.
+        self.subject_one = Subject.objects.create(
+            name="Mathematics",
+            code="MTH",
+        )
+
+        self.subject_two = Subject.objects.create(
+            name="English",
+            code="ENG",
+        )
+
+        # Give each teacher a different assignment.
+        SubjectAssignment.objects.create(
+            teacher=self.teacher,
+            subject=self.subject_one,
+            school_class=self.class_one,
+            academic_session=self.session,
+        )
+
+        SubjectAssignment.objects.create(
+            teacher=self.other_teacher,
+            subject=self.subject_two,
+            school_class=self.class_two,
+            academic_session=self.session,
+        )
+
+        # Create students and enrollments.
+        self.student_one = Student.objects.create(
+            admission_number="STU0001",
+            first_name="John",
+            last_name="Student",
+            date_of_birth=date(2015, 1, 1),
+            gender="male",
+            address="Lagos",
+            status="active",
+        )
+
+        self.student_two = Student.objects.create(
+            admission_number="STU0002",
+            first_name="Jane",
+            last_name="Student",
+            date_of_birth=date(2015, 2, 1),
+            gender="female",
+            address="Abuja",
+            status="active",
+        )
+
+        self.enrollment_one = Enrollment.objects.create(
+            student=self.student_one,
+            school_class=self.class_one,
+            academic_session=self.session,
+        )
+
+        self.enrollment_two = Enrollment.objects.create(
+            student=self.student_two,
+            school_class=self.class_two,
+            academic_session=self.session,
+        )
+
+        # Create a term and assessment configuration.
+        self.term = Term.objects.create(
+            term="First",
+            academic_session=self.session,
+            start_date=date(2026, 9, 1),
+            end_date=date(2026, 12, 15),
+        )
+
+        self.configuration = AssessmentConfiguration.objects.create(
+            name="Test Assessment",
+            is_active=False,
+        )
+
+        # Create one draft result for each teacher.
+        self.own_draft = Result.objects.create(
+            enrollment=self.enrollment_one,
+            subject=self.subject_one,
+            term=self.term,
+            assessment_configuration=self.configuration,
+        )
+
+        self.other_draft = Result.objects.create(
+            enrollment=self.enrollment_two,
+            subject=self.subject_two,
+            term=self.term,
+            assessment_configuration=self.configuration,
+        )
+
+    def test_teacher_sees_only_own_drafts(self):
+        drafts = get_teacher_draft_results(
+            self.teacher_user
+        )
+
+        self.assertIn(self.own_draft, drafts)
+        self.assertNotIn(self.other_draft, drafts)
+
+
+    def test_teacher_cannot_edit_another_teachers_draft(self):
+        self.client.force_login(self.teacher_user)
+
+        response = self.client.get(
+            reverse(
+                "teacher_edit_draft_result",
+                args=[self.other_draft.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)  
 class LoginRedirectTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(

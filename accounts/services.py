@@ -307,6 +307,13 @@ def get_teacher_draft_results(user):
         "subject__name",
     )
 
+def test_teacher_cannot_see_another_teachers_draft(self):
+    drafts = get_teacher_draft_results(self.teacher_user)
+
+    self.assertNotIn(
+        self.other_teacher_draft,
+        drafts,
+    )
 
 @transaction.atomic
 def update_draft_result(user, result, scores):

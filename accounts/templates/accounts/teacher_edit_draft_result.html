@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,14 +9,32 @@
     <h1>Edit Draft Result</h1>
 
     <p>
+        <a href="{% url 'home' %}">Back to Dashboard</a>
+    </p>
+
+    <h2>Student Information</h2>
+
+    <p>
         Student:
         {{ result.enrollment.student.first_name }}
         {{ result.enrollment.student.last_name }}
     </p>
 
+    <p>Admission Number:
+        {{ result.enrollment.student.admission_number }}
+    </p>
+
     <p>Subject: {{ result.subject.name }}</p>
     <p>Term: {{ result.term.term }}</p>
     <p>Class: {{ result.enrollment.school_class.name }}</p>
+
+    {% if messages %}
+        {% for message in messages %}
+            <p>{{ message }}</p>
+        {% endfor %}
+    {% endif %}
+
+    <h2>Assessment Scores</h2>
 
     <form method="post">
         {% csrf_token %}

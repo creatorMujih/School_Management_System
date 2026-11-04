@@ -1,8 +1,8 @@
-from accounts.models import AssessmentConfiguration, Result
+from accounts.models import AssessmentConfiguration, Result, Parent, Student
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError, ObjectDoesNotExist
 from django.shortcuts import render, redirect, get_object_or_404
 from .forms import AdmissionApplicationForm, TeacherResultEntryForm, ComponentScoreEntryForm
 from .services import create_admission_application, create_draft_result, get_teacher_draft_results, update_draft_result, publish_result, get_teacher_assignments
@@ -269,15 +269,34 @@ def home(request):
 
     elif role == "teacher":
         dashboard = "accounts/teacher_dashboard.html"
+
         assignments = get_teacher_assignments(request.user)
 
         context = {
             "assignments": assignments,
         }
 
+    
     elif role == "parent":
         dashboard = "accounts/parent_dashboard.html"
-        context = {}
+
+        try:
+            parent = request.user.parent
+
+            children = Student.objects.filter(
+                parent=parent
+            ).prefetch_related(
+                "enrollment_set__school_class",
+                "enrollment_set__academic_session",
+            )
+
+        except ObjectDoesNotExist:
+            children = Student.objects.none()
+
+        context = {
+            "children": children,
+        }
+
 
     elif role == "student":
         dashboard = "accounts/student_dashboard.html"

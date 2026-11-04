@@ -2,10 +2,47 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Parent Dashboard</title>
 </head>
 <body>
     <h1>Parent Dashboard</h1>
-    <p>Welcome to the School Management System.</p>
+
+    <p>Welcome, {{ request.user.username }}.</p>
+
+    <h2>My Children</h2>
+
+    {% if children %}
+        {% for child in children %}
+            <hr>
+
+            <h3>
+                {{ child.first_name }}
+                {{ child.last_name }}
+            </h3>
+
+            <p>Admission Number: {{ child.admission_number }}</p>
+            <p>Status: {{ child.status }}</p>
+
+            <h4>Enrolment Information</h4>
+
+            {% for enrollment in child.enrollments.all %}
+                <p>Class: {{ enrollment.school_class.name }}</p>
+                <p>Academic Session: {{ enrollment.academic_session.name }}</p>
+            {% empty %}
+                <p>This student has no enrollment records.</p>
+            {% endfor %}
+
+        {% endfor %}
+    {% else %}
+        <p>No children are currently linked to your parent account.</p>
+    {% endif %}
+
+    <h2>Account</h2>
+
+    <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button type="submit">Logout</button>
+    </form>
 </body>
 </html>
