@@ -10,31 +10,51 @@
 
     <p>Welcome, {{ request.user.username }}.</p>
 
-    <h2>My Assigned Classes and Subjects</h2>
+    <h2>My Teaching Assignments</h2>
 
     {% if assignments %}
-        <table border="1" cellpadding="10">
+        <table border="1">
             <thead>
                 <tr>
-                    <th>Class</th>
                     <th>Subject</th>
+                    <th>Class</th>
                     <th>Academic Session</th>
                 </tr>
             </thead>
-
             <tbody>
                 {% for assignment in assignments %}
                     <tr>
-                        <td>{{ assignment.school_class.name }}</td>
                         <td>{{ assignment.subject.name }}</td>
+                        <td>{{ assignment.school_class.name }}</td>
                         <td>{{ assignment.academic_session.name }}</td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
     {% else %}
-        <p>You currently have no active class or subject assignments.</p>
+        <p>You currently have no active teaching assignments.</p>
     {% endif %}
 
+    <h2>Teacher Activities</h2>
+
+    <ul>
+        <li>
+            <a href="{% url 'teacher_result_entry' %}">
+                Enter Results
+            </a>
+        </li>
+        <li>
+            <a href="{% url 'teacher_draft_results' %}">
+                View Draft Results
+            </a>
+        </li>
+    </ul>
+
+    <h2>Account</h2>
+
+    <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button type="submit">Logout</button>
+    </form>
 </body>
 </html>

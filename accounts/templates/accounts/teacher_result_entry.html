@@ -8,6 +8,16 @@
 <body>
     <h1>Enter Student Results</h1>
 
+    <p>
+        <a href="{% url 'home' %}">Back to Dashboard</a>
+    </p>
+
+    {% if messages %}
+        {% for message in messages %}
+            <p>{{ message }}</p>
+        {% endfor %}
+    {% endif %}
+
     {% if configuration_error %}
         <p>{{ configuration_error }}</p>
     {% else %}

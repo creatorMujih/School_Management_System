@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.shortcuts import render, redirect, get_object_or_404
 from .forms import AdmissionApplicationForm, TeacherResultEntryForm, ComponentScoreEntryForm
-from .services import create_admission_application, create_draft_result, get_teacher_draft_results, update_draft_result, publish_result
+from .services import create_admission_application, create_draft_result, get_teacher_draft_results, update_draft_result, publish_result, get_teacher_assignments
 from django.utils.http import url_has_allowed_host_and_scheme
 
 
