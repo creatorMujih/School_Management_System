@@ -374,7 +374,31 @@ def update_draft_result(user, result, scores):
 
     return result
 
+def get_parent_published_results(user):
+    
+#Return published results belonging only to a parent's children."""
+    if not user.is_authenticated or user.role != "parent":
+        return Result.objects.none()
 
+    return Result.objects.filter(
+        enrollment__student__parent__user=user,
+        is_published=True,
+    ).select_related(
+        "enrollment__student",
+        "enrollment__school_class",
+        "enrollment__academic_session",
+        "subject",
+        "term",
+        "term__academic_session",
+        "assessment_configuration",
+    ).prefetch_related(
+        "component_scores__assessment_component",
+    ).order_by(
+        "term__academic_session__name",
+        "term__term",
+        "enrollment__student__last_name",
+        "subject__name",
+    )
 
 
     

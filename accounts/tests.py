@@ -6,7 +6,8 @@ from accounts.services import (
     get_students_for_teacher,
     create_draft_result,
     get_teacher_draft_results,
-    update_draft_result
+    update_draft_result,
+    get_parent_published_results,
 )
 from django.urls import reverse
 from django.contrib.auth import get_user_model
@@ -2043,3 +2044,49 @@ class LogoutTests(TestCase):
 
         self.assertEqual(response.status_code, 405)
         self.assertIn("_auth_user_id", self.client.session)
+
+class ParentPublishedResultsTests(TestCase):
+
+    def setUp(self):
+        self.parent_user = User.objects.create_user(
+            username="parent_results",
+            password="test-password-123",
+            role="parent",
+        )
+
+        self.parent = Parent.objects.create(
+            user=self.parent_user,
+        )
+
+        self.other_parent_user = User.objects.create_user(
+            username="other_parent_results",
+            password="test-password-123",
+            role="parent",
+        )
+
+        self.other_parent = Parent.objects.create(
+            user=self.other_parent_user,
+        )
+
+    def test_parent_receives_only_published_results_for_own_children(self):
+        results = get_parent_published_results(self.parent_user)
+
+        self.assertEqual(results.count(), 0)
+
+    def test_non_parent_receives_no_results(self):
+        admin_user = User.objects.create_user(
+            username="admin_results",
+            password="test-password-123",
+            role="admin",
+        )
+
+        results = get_parent_published_results(admin_user)
+
+        self.assertEqual(results.count(), 0)
+
+    def test_unauthenticated_user_receives_no_results(self):
+        user = User()
+
+        results = get_parent_published_results(user)
+
+        self.assertEqual(results.count(), 0)
